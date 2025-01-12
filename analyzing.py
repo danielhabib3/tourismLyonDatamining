@@ -4,82 +4,92 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import folium
+
+# Read the csv file
+df = pd.read_csv('./data/flickr_data2.csv', low_memory=False)
+
+df_no_duplicates = df.drop_duplicates(keep='first', inplace=False)
+
+print(len(df_no_duplicates))
+
+df_no_null = df_no_duplicates.dropna(subset=[' lat', ' long', ' date_taken_minute', ' date_taken_hour', ' date_taken_day', ' date_taken_month', ' date_taken_year', ' date_upload_minute', ' date_upload_hour', ' date_upload_day', ' date_upload_month', ' date_upload_year'], inplace=False)
 
 
-# Function to read the csv file
-def read_csv_file(file):
-    with open(file, 'r') as f:
-        reader = csv.reader(f)
-        data = list(reader)
-    return data
-
-data = read_csv_file('./data/flickr_data2.csv')
-
-# Data frame with the data
-raw_data = pd.DataFrame(data[1:], columns=[col.strip() for col in data[0]])
-
-# # Dropping unuseful columns
-# print(raw_data.columns) # The 3 last columns are unnamed
-# # Drop the three last columns
-# raw_data = raw_data.drop(raw_data.columns[-3:], axis=1)
-# # print(raw_data.columns)
-
-print(len(raw_data)) # 420240
-
-# lets delete the duplicates in the data based on all columns
-raw_data_without_duplicates = raw_data.drop_duplicates(keep='first').copy().reset_index(drop=True) 
-print(len(raw_data_without_duplicates)) # 168110
-
-# export the data to a new csv file
-raw_data_without_duplicates.to_csv('./data/data-no-duplicates.csv', index=False)
-
-
-# we want to put constraints on the data values in columns
-# 1. The values in the column 'lat' should be between -90 and 90
-# 2. The values in the column 'long' should be between -180 and 180
-# 3. the values in the column 'date_taken_minute' should be between 0 and 59
-# 4. the values in the column 'date_taken_hour' should be between 0 and 23
-# 5. the values in the column 'date_taken_day' should be between 1 and 31
-# 6. the values in the column 'date_taken_month' should be between 1 and 12
-# 7. the values in the column 'date_taken_year' should be between 1900 and present year
-# 8. the values in the column 'date_uploaded_minute' should be between 0 and 59
-# 9. the values in the column 'date_uploaded_hour' should be between 0 and 23
-# 10. the values in the column 'date_uploaded_day' should be between 1 and 31
-# 11. the values in the column 'date_uploaded_month' should be between 1 and 12
-# 12. the values in the column 'date_uploaded_year' should be between 1900 and present year
-
-# Use the dropna() function to remove rows with missing values from th 12 columns
-cleaned_data = raw_data_without_duplicates.dropna()
-# export the data to a new csv file
-cleaned_data.to_csv('./data/clean-data.csv', index=False)
-print(len(cleaned_data)) 
+print(len(df_no_null))
 
 
 
-for index, data_row in cleaned_data.iterrows():
-    # print(data_row['id'], index)
-    if (float(data_row['lat']) < -90 or float(data_row['lat']) > 90 or
-        float(data_row['long']) < -180 or float(data_row['long']) > 180 or
-        int(data_row['date_taken_minute']) < 0 or int(data_row['date_taken_minute']) > 59 or
-        int(data_row['date_taken_hour']) < 0 or int(data_row['date_taken_hour']) > 23 or
-        int(data_row['date_taken_day']) < 1 or int(data_row['date_taken_day']) > 31 or
-        int(data_row['date_taken_month']) < 1 or int(data_row['date_taken_month']) > 12 or
-        int(data_row['date_taken_year']) < 1900 or int(data_row['date_taken_year']) > 2021 or
-        int(data_row['date_upload_minute']) < 0 or int(data_row['date_upload_minute']) > 59 or
-        int(data_row['date_upload_hour']) < 0 or int(data_row['date_upload_hour']) > 23 or
-        int(data_row['date_upload_day']) < 1 or int(data_row['date_upload_day']) > 31 or
-        int(data_row['date_upload_month']) < 1 or int(data_row['date_upload_month']) > 12 or
-        int(data_row['date_upload_year']) < 1900 or int(data_row['date_upload_year']) > 2021):
-        raw_data.drop(index, inplace=True)
+# Convert all date columns to numeric, forcing errors to NaN
+date_columns = [' date_taken_minute', ' date_taken_hour', ' date_taken_day', ' date_taken_month', ' date_taken_year', 
+                ' date_upload_minute', ' date_upload_hour', ' date_upload_day', ' date_upload_month', ' date_upload_year']
 
-print(len(cleaned_data)) 
+for col in date_columns:
+    df_no_null.loc[:, col] = pd.to_numeric(df_no_null[col], errors='coerce')
 
+# Drop rows with NaN values in any of the date columns
+df_clean = df_no_null.dropna(subset=date_columns, inplace=False)
 
+print(len(df_clean))
 
+# change the type of a column
+for col in date_columns:
+    df_clean.loc[:, col] = df_clean[col].astype(int)
 
+# Define the ranges for each column
+ranges = {
+    ' lat': (-90, 90),
+    ' long': (-180, 180),
+    ' date_taken_minute': (0, 59),
+    ' date_taken_hour': (0, 23),
+    ' date_taken_day': (1, 31),
+    ' date_taken_month': (1, 12),
+    ' date_taken_year': (1900, 2021),
+    ' date_upload_minute': (0, 59),
+    ' date_upload_hour': (0, 23),
+    ' date_upload_day': (1, 31),
+    ' date_upload_month': (1, 12),
+    ' date_upload_year': (1900, 2021)
+}
 
+# Filter the dataframe based on the defined ranges
+for col, (min_val, max_val) in ranges.items():
+    df_clean = df_clean.loc[(df_clean[col] >= min_val) & (df_clean[col] <= max_val)]
 
+# convert the dataframe to csv
+df_clean.to_csv('./data/flickr_data2_cleaned.csv', index=False)
 
+print(len(df_clean))
+
+# Example list of latitude and longitude coordinates
+# coordinates = [
+#     (48.8566, 2.3522),  # Paris
+#     (51.5074, -0.1278),  # London
+#     (40.7128, -74.0060),  # New York
+#     (35.6895, 139.6917)   # Tokyo
+# ]
+# Extract latitude and longitude coordinates from the dataframe
+coordinates = list(set(zip(df_clean[' lat'], df_clean[' long'])))
+
+print(len(coordinates))
+
+# Create a Folium map centered on the average coordinates
+# Define the coordinates for Lyon
+lyon_center = [45.75, 4.85]  # Approximate center of Lyon
+map = folium.Map(location=lyon_center, zoom_start=13)
+
+# Define the bounds for Lyon, similar to the Leaflet example
+lyon_bounds = [[45.696, 4.752], [45.85, 4.9]]
+
+# Fit the map to the bounds
+map.fit_bounds(lyon_bounds)
+
+# Add markers to the map for the first 50 coordinates only
+for lat, lon in coordinates[:50]:
+    folium.Marker(location=(lat, lon), popup=f"Lat: {lat}, Lon: {lon}").add_to(map)
+
+# Save the map to an HTML file
+map.save("map.html")
 
 
 
