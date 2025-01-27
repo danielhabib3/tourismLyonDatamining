@@ -5,91 +5,142 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import folium
-
-# Read the csv file
-df = pd.read_csv('./data/flickr_data2.csv', low_memory=False)
-
-df_no_duplicates = df.drop_duplicates(keep='first', inplace=False)
-
-print(len(df_no_duplicates))
-
-df_no_null = df_no_duplicates.dropna(subset=[' lat', ' long', ' date_taken_minute', ' date_taken_hour', ' date_taken_day', ' date_taken_month', ' date_taken_year', ' date_upload_minute', ' date_upload_hour', ' date_upload_day', ' date_upload_month', ' date_upload_year'], inplace=False)
-
-
-print(len(df_no_null))
+import os
+from sklearn.cluster import KMeans
+import datamining as dm  # contains clean_data, generate_map
+from scipy.cluster.hierarchy import linkage, dendrogram
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.cluster import DBSCAN
+from sklearn.neighbors import NearestNeighbors
 
 
 
-# Convert all date columns to numeric, forcing errors to NaN
-date_columns = [' date_taken_minute', ' date_taken_hour', ' date_taken_day', ' date_taken_month', ' date_taken_year', 
-                ' date_upload_minute', ' date_upload_hour', ' date_upload_day', ' date_upload_month', ' date_upload_year']
+file_path = './data/flickr_data2_cleaned.csv'
 
-for col in date_columns:
-    df_no_null.loc[:, col] = pd.to_numeric(df_no_null[col], errors='coerce')
+# List of files to delete if they exist
+files_to_delete = ['./map.html', './elbow.png', './distance_to_4th_nearest_point.png', './mapLargestCluster.html']
 
-# Drop rows with NaN values in any of the date columns
-df_clean = df_no_null.dropna(subset=date_columns, inplace=False)
+# Loop through the list and delete each file if it exists
+for file in files_to_delete:
+    if os.path.exists(file):
+        os.remove(file)
 
-print(len(df_clean))
+# df has to contain 157842 rows
+if not(os.path.exists(file_path)):
+    print('Data file not found. Cleaning data...')
+    df = dm.clean_data('./data/flickr_data2.csv')
+else:
+    print('Data file found. Reading data...')
+    df = pd.read_csv(file_path, low_memory=False)
 
-# change the type of a column
-for col in date_columns:
-    df_clean.loc[:, col] = df_clean[col].astype(int)
+df_cluster = df[['lat', 'long']]  # Extract the coordinates for clustering
 
-# Define the ranges for each column
-ranges = {
-    ' lat': (-90, 90),
-    ' long': (-180, 180),
-    ' date_taken_minute': (0, 59),
-    ' date_taken_hour': (0, 23),
-    ' date_taken_day': (1, 31),
-    ' date_taken_month': (1, 12),
-    ' date_taken_year': (1900, 2021),
-    ' date_upload_minute': (0, 59),
-    ' date_upload_hour': (0, 23),
-    ' date_upload_day': (1, 31),
-    ' date_upload_month': (1, 12),
-    ' date_upload_year': (1900, 2021)
-}
+# df = dm.kmeans_algorithm(df, 100)  # Apply the KMeans algorithm
 
-# Filter the dataframe based on the defined ranges
-for col, (min_val, max_val) in ranges.items():
-    df_clean = df_clean.loc[(df_clean[col] >= min_val) & (df_clean[col] <= max_val)]
 
-# convert the dataframe to csv
-df_clean.to_csv('./data/flickr_data2_cleaned.csv', index=False)
 
-print(len(df_clean))
+# #_______________________________________________________________________________________________________________________
+# # # Calculate the distance to the fourth nearest point for each point
+# # # Extract the coordinates
+# # coords = df[['lat', 'long']].values
 
-# Example list of latitude and longitude coordinates
-# coordinates = [
-#     (48.8566, 2.3522),  # Paris
-#     (51.5074, -0.1278),  # London
-#     (40.7128, -74.0060),  # New York
-#     (35.6895, 139.6917)   # Tokyo
-# ]
-# Extract latitude and longitude coordinates from the dataframe
-coordinates = list(set(zip(df_clean[' lat'], df_clean[' long'])))
+# # # Fit the NearestNeighbors model
+# # nbrs = NearestNeighbors(n_neighbors=5).fit(coords)
+# # distances, indices = nbrs.kneighbors(coords)
 
-print(len(coordinates))
+# # # The fourth nearest point is at index 4 (0-based index)
+# # fourth_distances = distances[:, 4]
 
-# Create a Folium map centered on the average coordinates
-# Define the coordinates for Lyon
-lyon_center = [45.75, 4.85]  # Approximate center of Lyon
-map = folium.Map(location=lyon_center, zoom_start=13)
+# # # Plot the distances
+# # plt.figure(figsize=(10, 6))
+# # plt.plot(range(len(fourth_distances)), sorted(fourth_distances, reverse=True))
+# # plt.xlabel('Points')
+# # plt.ylabel('Distance to 4th Nearest Point')
+# # plt.title('Distance to 4th Nearest Point for Each Point')
+# # plt.savefig('distance_to_4th_nearest_point.png')
 
-# Define the bounds for Lyon, similar to the Leaflet example
-lyon_bounds = [[45.696, 4.752], [45.85, 4.9]]
+# # _______________________________________________________________________________________________________________________
 
-# Fit the map to the bounds
-map.fit_bounds(lyon_bounds)
+# # get the value of distance from the plot when it is stable
+# stable_distance = 0.0004
+# print(f'Stable distance: {stable_distance}')
 
-# Add markers to the map for the first 50 coordinates only
-for lat, lon in coordinates[:50]:
-    folium.Marker(location=(lat, lon), popup=f"Lat: {lat}, Lon: {lon}").add_to(map)
 
-# Save the map to an HTML file
-map.save("map.html")
+# dbscan = DBSCAN(eps=stable_distance, min_samples=5)
+# dbscan.fit(df_cluster)
+# # associated cluster labels
+# df['dbscan_cluster'] = dbscan.labels_
+
+# # number of clusters
+# n_clusters = len(set(df['dbscan_cluster'])) - (1 if -1 in df['dbscan_cluster'] else 0)
+# print(f"Number of clusters: {n_clusters}")
+# # number of noise points
+# n_noise = list(df['dbscan_cluster']).count(-1)
+# print(f"Number of noise points: {n_noise}")
+
+
+
+# coordinates = list(set(zip(df['lat'], df['long'], df['dbscan_cluster'])))
+# dm.generate_map(coordinates, 1000)  # Générer la carte
+
+# # get the cluster with the most points
+# largest_cluster = df['dbscan_cluster'].value_counts().idxmax()
+# print(f"Largest cluster: {largest_cluster}")
+
+# # reapply the dbscan algorithm on the largest cluster
+# df_largest_cluster = df[df['dbscan_cluster'] == largest_cluster][['lat', 'long']]
+# df_largest = df_largest_cluster.copy()
+
+# #_______________________________________________________________________________________________________________________
+# # Extract the coordinates
+# # coords_vieuxLyon = df_largest[['lat', 'long']].values
+
+# # # Fit the NearestNeighbors model
+# # nbrs_vieuxLyon = NearestNeighbors(n_neighbors=5).fit(coords_vieuxLyon)
+# # distances_vieuxLyon, indices_vieuxLyon = nbrs_vieuxLyon.kneighbors(coords_vieuxLyon)
+
+# # # The fourth nearest point is at index 4 (0-based index)
+# # fourth_distances_vieuxLyon = distances_vieuxLyon[:, 4]
+
+# # # Plot the distances
+# # plt.figure(figsize=(10, 6))
+# # plt.plot(range(len(fourth_distances_vieuxLyon)), sorted(fourth_distances_vieuxLyon, reverse=True))
+# # plt.xlabel('Points')
+# # plt.ylabel('Distance to 4th Nearest Point')
+# # plt.title('Distance to 4th Nearest Point for Each Point')
+# # plt.savefig('vieuxLyon_distance_to_4th_nearest_point.png')
+
+# # _______________________________________________________________________________________________________________________
+
+# dbscan_vieuxLyon = DBSCAN(eps=0.009, min_samples=4)
+# dbscan_vieuxLyon.fit(df_largest_cluster)
+# df_largest['dbscan_cluster'] = dbscan_vieuxLyon.labels_
+
+# # number of clusters
+# n_clusters_vieuxLyon = len(set(df_largest['dbscan_cluster'])) - (1 if -1 in df_largest['dbscan_cluster'] else 0)
+# print(f"Number of clusters: {n_clusters_vieuxLyon}")
+# # number of noise points
+# n_noise_vieuxLyon = list(df_largest['dbscan_cluster']).count(-1)
+# print(f"Number of noise points: {n_noise_vieuxLyon}")
+
+# coordinates_vieuxLyon = list(set(zip(df_largest['lat'], df_largest['long'], df_largest['dbscan_cluster'])))
+# dm.generate_map(coordinates_vieuxLyon, 1000, "mapLargestCluster.html")  # Générer la carte
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
