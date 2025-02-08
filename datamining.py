@@ -68,7 +68,7 @@ def clean_data(file):
     print('Data cleaned and saved to ./data/flickr_data2_cleaned.csv')
     return df_clean
 
-def generate_map(coordinates, k, name='map.html'):
+def generate_map(coordinates, k, name='./maps/map.html'):
     # coordinates must be a list of tuples
     # coordinates = list(set(zip(df['lat'], df['long'])))
     # dm.generate_map(coordinates, 1000)  # Générer la carte
@@ -157,7 +157,7 @@ def agglomerative_clustering(df_cluster, df):
     print(f"Number of noise points: {n_noise}")
 
     coordinates = list(set(zip(df['lat'], df['long'], df['agglomerative_cluster'])))
-    generate_map(coordinates, 1000, "mapVieuxLyon.html")  # Générer la carte
+    generate_map(coordinates, 1000, "./maps/mapVieuxLyon.html")  # Générer la carte
     # dm.generate_map(coordinates, 1000)  # Générer la carte
 
     return df
