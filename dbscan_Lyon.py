@@ -81,21 +81,21 @@ print(f"Number of noise points: {n_noise}")
 
 
 coordinates = list(set(zip(df['lat'], df['long'], df['dbscan_cluster'])))
-dm.generate_map(coordinates, 1000, "./maps/mapCluster.html")  # Générer la carte
+# dm.generate_map(coordinates, 1000, "./maps/mapCluster.html")  # Générer la carte
 
 # get the cluster with the most points
 largest_cluster = df['dbscan_cluster'].value_counts().idxmax()
 print(f"Largest cluster: {largest_cluster}")
 
 # reapply the dbscan algorithm on the largest cluster
-df_largest_cluster = df[df['dbscan_cluster'] == largest_cluster][['lat', 'long']]
+df_largest_cluster = df[df['dbscan_cluster'] == largest_cluster][['lat', 'long', 'tags', 'title']]
 df_largest = df_largest_cluster.copy()
 
 # save the largest cluster in a csv file
 df_largest.to_csv('./data/flickr_data2_largest_cluster.csv', index=False)
 
 
-# print the number of clusters having less than 10 points in them
+# print the number of clusters having less than 50 points in them
 print(f"Number of clusters with less than 50 points: {df['dbscan_cluster'].value_counts()[df['dbscan_cluster'].value_counts() < 50].count()}")
 
 # create a new dataframe without the clusters having less than 50 points
@@ -103,21 +103,25 @@ filtered_clusters = df['dbscan_cluster'].value_counts()[df['dbscan_cluster'].val
 
 # print the number of clusters after filtering
 filtered_df = df[df['dbscan_cluster'].isin(filtered_clusters)]
-n_clusters_filtered = len(set(filtered_df['dbscan_cluster'])) - (1 if -1 in filtered_df['dbscan_cluster'] else 0)
-print(f"Number of clusters after filtering: {n_clusters_filtered}")
 
 coordinates_filtered = list(set(zip(filtered_df['lat'], filtered_df['long'], filtered_df['dbscan_cluster'])))
-dm.generate_map(coordinates_filtered, 5000, "./maps/mapFilteredCluster.html")  # Générer la
+# dm.generate_map(coordinates_filtered, 5000, "./maps/mapFilteredCluster.html")  # Générer la
 
 # save the filtered clusters in a csv file without the largest cluster and noise points, including the labels
-# Reorganize the labels to be consecutive integers starting from 1
-unique_labels = filtered_df['dbscan_cluster'].unique()
-label_mapping = {label: idx + 1 for idx, label in enumerate(unique_labels)}
+df_filtered = filtered_df[(filtered_df['dbscan_cluster'] != largest_cluster) & (filtered_df['dbscan_cluster'] != -1)][['lat', 'long', 'tags', 'title', 'dbscan_cluster']]
 
-filtered_df.loc[:, 'dbscan_cluster'] = filtered_df['dbscan_cluster'].map(label_mapping)
 
-df_filtered = filtered_df[(filtered_df['dbscan_cluster'] != label_mapping[largest_cluster]) & (filtered_df['dbscan_cluster'] != label_mapping[-1])][['lat', 'long', 'dbscan_cluster']]
+# print the number of clusters
+print('Number of clusters: ', len(df_filtered['dbscan_cluster'].unique()))
 
+# Make cluster numbers consecutive
+unique_clusters = df_filtered['dbscan_cluster'].unique()
+cluster_mapping = {old_cluster: new_cluster for new_cluster, old_cluster in enumerate(unique_clusters)}
+df_filtered['dbscan_cluster'] = df_filtered['dbscan_cluster'].map(cluster_mapping)
+
+# print the each cluster number and the number of points in it
+for cluster in df_filtered['dbscan_cluster'].unique():
+    print(f"Cluster {cluster}: {df_filtered[df_filtered['dbscan_cluster'] == cluster].shape[0]} points")
 
 df_filtered.to_csv('./data/flickr_data2_filtered_clusters.csv', index=False)
 

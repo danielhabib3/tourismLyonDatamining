@@ -9,6 +9,7 @@ from sklearn.cluster import KMeans
 import os
 from scipy.cluster.hierarchy import linkage, dendrogram
 from sklearn.cluster import AgglomerativeClustering
+from scipy.spatial import ConvexHull
 
 def clean_data(file):
     date_columns = ['date_taken_minute', 'date_taken_hour', 'date_taken_day', 'date_taken_month', 'date_taken_year', 
@@ -68,7 +69,8 @@ def clean_data(file):
     print('Data cleaned and saved to ./data/flickr_data2_cleaned.csv')
     return df_clean
 
-def generate_map(coordinates, k, name='./maps/map.html'):
+def generate_map(coordinates, k, Filename='./maps/map.html'):
+    print(f"Saving map to: {Filename}")
     # coordinates must be a list of tuples
     # coordinates = list(set(zip(df['lat'], df['long'])))
     # dm.generate_map(coordinates, 1000)  # Générer la carte
@@ -77,7 +79,7 @@ def generate_map(coordinates, k, name='./maps/map.html'):
         k = len(coordinates)
 
     # colors
-    colors = ['lightgray', 'green', 'darkred', 'black', 'darkgreen', 'white', 'orange', 'pink', 'blue', 'gray', 'lightgreen', 'beige', 'darkblue', 'lightblue', 'darkpurple', 'cadetblue', 'lightred', 'red', 'purple']
+    colors = ['darkred', 'darkgreen', 'darkpurple', 'darkblue', 'black', 'gray']
 
     # Define the coordinates for Lyon
     lyon_center = [45.75, 4.85]  # Approximate center of Lyon
@@ -89,13 +91,31 @@ def generate_map(coordinates, k, name='./maps/map.html'):
     # Fit the map to the bounds
     map.fit_bounds(lyon_bounds)
 
-    # Add markers to the map for the first 50 coordinates only
-    for lat, lon, col in coordinates[:k]:
+    # Group coordinates by cluster
+    clusters = {}
+    clusters_names = {}
+    for lat, lon, col, name in coordinates[:k]:
         if col != -1:
-            folium.Marker(location=(lat, lon), popup=f"{col}", icon=folium.Icon(color=colors[col%len(colors)])).add_to(map)
+            if col not in clusters:
+                clusters[col] = []
+            clusters[col].append((lat, lon))
+            clusters_names[col] = name
+
+    # Add markers and polygons to the map for each cluster
+    for col, points in clusters.items():
+        
+        # Create a marker for each point in the cluster
+        for lat, lon in points:
+            folium.Marker(location=[lat, lon], popup=f'Cluster: {clusters_names[col]}', icon=folium.Icon(color=colors[col % len(colors)])).add_to(map)
+
+        # Create a convex polygon that encloses the points of the cluster
+        if len(points) >= 3:  # ConvexHull requires at least 3 points
+            hull = ConvexHull(points)
+            hull_points = [points[vertex] for vertex in hull.vertices]
+            folium.Polygon(locations=hull_points, color=colors[col % len(colors)], fill=True, fill_opacity=0.2).add_to(map)
 
     # Save the map to an HTML file
-    map.save(name)
+    map.save(Filename)
 
 def kmeans_algorithm(df, k):
     # utiliser les premiers 1000 lignes

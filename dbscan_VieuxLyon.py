@@ -61,7 +61,7 @@ print(df_largest.head())
 df_sample = df_largest.sample(n=30000, random_state=42)
 
 dbscan_vieuxLyon = DBSCAN(eps=0.00009, min_samples=4)
-dbscan_vieuxLyon.fit(df_sample)
+dbscan_vieuxLyon.fit(df_sample[['lat', 'long']])
 df_sample['dbscan_cluster'] = dbscan_vieuxLyon.labels_
 
 # number of clusters
@@ -79,18 +79,27 @@ coordinates_vieuxLyon = list(set(zip(filtered_df_sample['lat'], filtered_df_samp
 
 print(f"Number of clusters with less than 50 points: {df_sample['dbscan_cluster'].value_counts()[df_sample['dbscan_cluster'].value_counts() < 50].count()}")
 
-#print number of cluster after filtering
-n_clustersfiltered_vieuxLyon = len(set(filtered_df_sample['dbscan_cluster'])) - (1 if -1 in filtered_df_sample['dbscan_cluster'] else 0)
-print(f"Number of clusters after filtering: {n_clustersfiltered_vieuxLyon}")
 
 
-dm.generate_map(coordinates_vieuxLyon, 5000, "./maps/mapLargestCluster.html")  # Générer la carte
+# dm.generate_map(coordinates_vieuxLyon, 5000, "./maps/mapLargestCluster.html")  # Générer la carte
 
-# Reorganize the labels to be consecutive integers starting from 130
-filtered_df_sample.loc[:, 'dbscan_cluster'] = filtered_df_sample['dbscan_cluster'].apply(lambda x: x + 130 if x != -1 else x)
 
 # save the filtered data to a csv file without the noise points
-filtered_df_sample[filtered_df_sample['dbscan_cluster'] != -1].to_csv('./data/flickr_data2_largest_cluster_filtered.csv', index=False)
+filtered_df_sample = filtered_df_sample[filtered_df_sample['dbscan_cluster'] != -1]
+
+# print the number of clusters
+print('Number of clusters: ', len(filtered_df_sample['dbscan_cluster'].unique()))
+
+# Make cluster numbers consecutive starting from 128
+unique_clusters = filtered_df_sample['dbscan_cluster'].unique()
+cluster_mapping = {old_cluster: new_cluster for new_cluster, old_cluster in enumerate(unique_clusters, 128)}
+filtered_df_sample['dbscan_cluster'] = filtered_df_sample['dbscan_cluster'].map(cluster_mapping)
+
+# print the cluster numbers and the number of points in each cluster
+for cluster in filtered_df_sample['dbscan_cluster'].unique():
+    print(f"Cluster {cluster}: {filtered_df_sample[filtered_df_sample['dbscan_cluster'] == cluster].shape[0]} points")
+
+filtered_df_sample.to_csv('./data/flickr_data2_largest_cluster_filtered.csv', index=False)
 
 
 
